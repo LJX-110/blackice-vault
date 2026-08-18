@@ -1,6 +1,7 @@
 const LS_SALT = 'kv.salt';
 const LS_VAULT = 'kv.vault';
 const LS_SETTINGS = 'kv.settings';
+const LS_COLLAPSED = 'kv.collapsed';
 const PBKDF2_ITERATIONS = 100000;
 
 const $ = (id) => document.getElementById(id);
@@ -13,6 +14,7 @@ let idleTimer = null;
 let editingProviderId = null;
 let editingKey = null;
 let editingModel = null;
+let dragItem = null;
 const visibleKeys = new Set();
 const collapsedSet = new Set();
 
@@ -32,6 +34,7 @@ const emptyState = $('empty-state');
 const emptyText = $('empty-text');
 const countEl = $('count');
 const toggleAllBtn = $('toggle-all-btn');
+const collapseAllBtn = $('collapse-all-btn');
 
 const providerModal = $('provider-modal');
 const providerForm = $('provider-form');
@@ -188,6 +191,18 @@ function saveSettings(s) {
   localStorage.setItem(LS_SETTINGS, JSON.stringify(s));
 }
 
+function loadCollapsed() {
+  collapsedSet.clear();
+  try {
+    const list = JSON.parse(localStorage.getItem(LS_COLLAPSED) || '[]');
+    if (Array.isArray(list)) list.forEach((id) => collapsedSet.add(id));
+  } catch {}
+}
+
+function saveCollapsed() {
+  localStorage.setItem(LS_COLLAPSED, JSON.stringify([...collapsedSet]));
+}
+
 function updateLockScreen() {
   isSetup = !hasVault();
   lockHint.textContent = isSetup
@@ -246,6 +261,7 @@ async function handleUnlock(e) {
 }
 
 function enterApp() {
+  loadCollapsed();
   lockScreen.classList.add('hidden');
   appScreen.classList.remove('hidden');
   render();
@@ -293,12 +309,13 @@ const SVG = {
   pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
   link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
-  chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>'
+  chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>',
+  copyMini: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
 };
 
 function keyRowHtml(p, k) {
   const shown = visibleKeys.has(k.id) ? k.key : maskKey(k.key);
-  return `<div class="key-row" title="${escapeHtml(k.notes || '')}">
+  return `<div class="key-row" draggable="true" data-drag="key" data-p="${p.id}" data-id="${k.id}" title="${escapeHtml(k.notes || '')}">
     <span class="key-label">${escapeHtml(k.label || '密钥')}</span>
     <span class="key-value">${escapeHtml(shown)}</span>
     <button type="button" class="icon-btn" data-a="toggle-key" data-p="${p.id}" data-id="${k.id}" title="显示/隐藏">${eyeSvg(visibleKeys.has(k.id))}</button>
@@ -309,7 +326,10 @@ function keyRowHtml(p, k) {
 }
 
 function modelBadgeHtml(p, m) {
-  return `<span class="badge" data-a="edit-model" data-p="${p.id}" data-id="${m.id}" title="${escapeHtml(m.notes || '点击编辑')}">${escapeHtml(m.name)}<span class="badge-del" data-a="del-model" data-p="${p.id}" data-id="${m.id}" title="删除模型">×</span></span>`;
+  return `<span class="badge" data-a="edit-model" data-p="${p.id}" data-id="${m.id}" title="${escapeHtml(m.notes || '点击编辑')}">${escapeHtml(m.name)}
+    <span class="badge-copy" data-a="copy-model" data-p="${p.id}" data-id="${m.id}" title="复制模型名">${SVG.copyMini}</span>
+    <span class="badge-del" data-a="del-model" data-p="${p.id}" data-id="${m.id}" title="删除模型">×</span>
+  </span>`;
 }
 
 function providerHtml(p) {
@@ -327,7 +347,7 @@ function providerHtml(p) {
   const modelsHtml = p.models.length
     ? `<div class="badges">${p.models.map((m) => modelBadgeHtml(p, m)).join('')}</div>`
     : '<div class="empty-tip">暂无模型</div>';
-  return `<div class="provider-card${collapsed ? ' collapsed' : ''}">
+  return `<div class="provider-card${collapsed ? ' collapsed' : ''}" draggable="true" data-drag="provider" data-id="${p.id}">
     <div class="provider-head">
       <button type="button" class="collapse-btn" data-a="toggle-card" data-p="${p.id}" title="展开/折叠">${SVG.chevron}</button>
       <span class="provider-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
@@ -388,6 +408,17 @@ function render() {
 
   const anyVisible = providers.some((p) => p.keys.some((k) => visibleKeys.has(k.id)));
   toggleAllBtn.textContent = anyVisible ? '全部隐藏' : '全部显示';
+  collapseAllBtn.textContent = collapsedSet.size > 0 ? '全部展开' : '全部收起';
+}
+
+function toggleCollapseAll() {
+  const anyCollapsed = collapsedSet.size > 0;
+  collapsedSet.clear();
+  if (!anyCollapsed) {
+    providers.forEach((p) => collapsedSet.add(p.id));
+  }
+  saveCollapsed();
+  render();
 }
 
 function toggleAllVisible() {
@@ -450,6 +481,7 @@ function deleteProvider(id) {
   if (!confirm(`确定删除供应商「${p.name}」吗？将同时删除其 ${p.keys.length} 枚密钥、${p.models.length} 个模型。`)) return;
   providers = providers.filter((x) => x.id !== id);
   collapsedSet.delete(id);
+  saveCollapsed();
   encryptVault().then(() => {
     render();
     toast('已删除');
@@ -478,6 +510,54 @@ function deleteModel(pid, mid) {
     render();
     toast('模型已删除');
   });
+}
+
+async function copyModelName(pid, mid) {
+  const m = findModel(pid, mid);
+  if (!m) return;
+  const ok = await copyText(m.name);
+  toast(ok ? '模型名已复制' : '复制失败', !ok);
+}
+
+function moveProvider(fromId, toId) {
+  const from = providers.findIndex((p) => p.id === fromId);
+  const to = providers.findIndex((p) => p.id === toId);
+  if (from < 0 || to < 0 || from === to) return;
+  const [item] = providers.splice(from, 1);
+  providers.splice(to, 0, item);
+  persistOrder();
+}
+
+function moveKey(pid, fromId, toId) {
+  const p = findProvider(pid);
+  if (!p) return;
+  const from = p.keys.findIndex((k) => k.id === fromId);
+  const to = p.keys.findIndex((k) => k.id === toId);
+  if (from < 0 || to < 0 || from === to) return;
+  const [item] = p.keys.splice(from, 1);
+  p.keys.splice(to, 0, item);
+  persistOrder();
+}
+
+function persistOrder() {
+  encryptVault().then(() => {
+    render();
+    toast('排序已保存');
+  });
+}
+
+function clearDragOver() {
+  grid.querySelectorAll('.drag-over, .dragging').forEach((el) => {
+    el.classList.remove('drag-over', 'dragging');
+  });
+}
+
+function resolveDragTarget(el, type) {
+  let node = el && el.closest('[data-drag]');
+  if (node && type === 'provider' && node.dataset.drag === 'key') {
+    node = node.closest('[data-drag="provider"]');
+  }
+  return node;
 }
 
 function fillProviderSelect(sel, selectedId) {
@@ -751,12 +831,21 @@ function init() {
     return;
   }
 
+  const required = ['lock-btn-top', 'add-btn', 'backup-btn', 'pwd-btn', 'toggle-all-btn', 'collapse-all-btn', 'search-input', 'grid', 'count', 'export-btn', 'auto-lock', 'import-file', 'provider-form', 'key-form', 'model-form', 'pwd-form'];
+  const missing = required.filter((id) => !$(id));
+  if (missing.length) {
+    lockHint.textContent = '页面资源加载异常（缺少：' + missing.join(', ') + '）。请按 Ctrl+F5 强制刷新，或清除浏览器缓存后重试。';
+    lockForm.classList.add('hidden');
+    return;
+  }
+
   updateLockScreen();
 
   lockForm.addEventListener('submit', handleUnlock);
   $('lock-btn-top').addEventListener('click', lockNow);
   $('add-btn').addEventListener('click', () => openProviderModal(null));
   toggleAllBtn.addEventListener('click', toggleAllVisible);
+  collapseAllBtn.addEventListener('click', toggleCollapseAll);
   $('backup-btn').addEventListener('click', openBackupModal);
   $('pwd-btn').addEventListener('click', openPwdModal);
   $('export-btn').addEventListener('click', doExport);
@@ -788,6 +877,7 @@ function init() {
     const id = el.dataset.id;
     if (a === 'toggle-card') {
       collapsedSet.has(pid) ? collapsedSet.delete(pid) : collapsedSet.add(pid);
+      saveCollapsed();
       render();
     } else if (a === 'copy-url') {
       copyUrl(pid);
@@ -812,7 +902,52 @@ function init() {
       openModelModal(pid, id);
     } else if (a === 'del-model') {
       deleteModel(pid, id);
+    } else if (a === 'copy-model') {
+      copyModelName(pid, id);
     }
+  });
+
+  grid.addEventListener('dragstart', (e) => {
+    const el = resolveDragTarget(e.target, null);
+    if (!el) return;
+    dragItem = { type: el.dataset.drag, pid: el.dataset.p || null, id: el.dataset.id };
+    e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('text/plain', dragItem.id);
+    } catch {}
+    el.classList.add('dragging');
+  });
+
+  grid.addEventListener('dragover', (e) => {
+    if (!dragItem) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const el = resolveDragTarget(e.target, dragItem.type);
+    if (!el || el.dataset.drag !== dragItem.type) return;
+    if (dragItem.type === 'key' && el.dataset.p !== dragItem.pid) return;
+    if (el.dataset.id === dragItem.id) return;
+    clearDragOver();
+    el.classList.add('drag-over');
+  });
+
+  grid.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!dragItem) return;
+    const el = resolveDragTarget(e.target, dragItem.type);
+    clearDragOver();
+    if (el && el.dataset.drag === dragItem.type) {
+      if (dragItem.type === 'provider' && el.dataset.id !== dragItem.id) {
+        moveProvider(dragItem.id, el.dataset.id);
+      } else if (dragItem.type === 'key' && el.dataset.p === dragItem.pid && el.dataset.id !== dragItem.id) {
+        moveKey(dragItem.pid, dragItem.id, el.dataset.id);
+      }
+    }
+    dragItem = null;
+  });
+
+  grid.addEventListener('dragend', () => {
+    clearDragOver();
+    dragItem = null;
   });
 
   document.querySelectorAll('[data-toggle]').forEach((btn) => {

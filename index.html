@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <title>锁玉函</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -70,6 +70,12 @@
         <input type="text" id="search-input" placeholder="搜索供应商 / 密钥 / 模型">
       </div>
       <button type="button" id="toggle-all-btn" class="btn btn-ghost"></button>
+      <button type="button" id="collapse-all-btn" class="btn btn-ghost" title="一键展开/收起全部供应商">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+          <polyline points="6 4 12 10 18 4"/><polyline points="6 20 12 14 18 20"/>
+        </svg>
+        全部收起
+      </button>
       <button type="button" id="backup-btn" class="btn btn-ghost">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
@@ -283,6 +289,6 @@
 
 <div id="toast" class="toast hidden"></div>
 
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

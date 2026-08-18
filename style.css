@@ -302,6 +302,29 @@ main {
   transition: box-shadow .15s;
 }
 
+.provider-card[draggable="true"],
+.key-row[draggable="true"] {
+  cursor: grab;
+}
+
+.provider-card[draggable="true"]:active,
+.key-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.provider-card.dragging,
+.key-row.dragging {
+  opacity: 0.4;
+}
+
+.provider-card.drag-over {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.key-row.drag-over {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
 .provider-card:hover {
   box-shadow: 0 10px 26px rgba(42, 42, 42, 0.11);
 }
@@ -505,7 +528,20 @@ main {
   transition: opacity .15s;
 }
 
-.badge:hover .badge-del {
+.badge-copy {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity .15s, color .15s;
+}
+
+.badge-copy:hover {
+  color: var(--primary);
+}
+
+.badge:hover .badge-del,
+.badge:hover .badge-copy {
   opacity: 1;
 }
 
