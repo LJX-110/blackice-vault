@@ -302,19 +302,43 @@ main {
   transition: box-shadow .15s;
 }
 
-.provider-card[draggable="true"],
-.key-row[draggable="true"] {
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
   cursor: grab;
+  background: none;
+  border: none;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0.45;
+  transition: opacity .15s, background .15s;
+  touch-action: none;
 }
 
-.provider-card[draggable="true"]:active,
-.key-row[draggable="true"]:active {
+.drag-handle:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.drag-handle:active {
   cursor: grabbing;
+}
+
+.provider-head .drag-handle {
+  margin-right: -6px;
+}
+
+.key-row .drag-handle {
+  margin-right: 2px;
 }
 
 .provider-card.dragging,
 .key-row.dragging {
-  opacity: 0.4;
+  opacity: 0.85;
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .provider-card.drag-over {

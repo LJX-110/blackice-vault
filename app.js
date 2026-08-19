@@ -310,12 +310,14 @@ const SVG = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
   link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>',
-  copyMini: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+  copyMini: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  grip: '<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>'
 };
 
 function keyRowHtml(p, k) {
   const shown = visibleKeys.has(k.id) ? k.key : maskKey(k.key);
-  return `<div class="key-row" draggable="true" data-drag="key" data-p="${p.id}" data-id="${k.id}" title="${escapeHtml(k.notes || '')}">
+  return `<div class="key-row" title="${escapeHtml(k.notes || '')}">
+    <span class="drag-handle" draggable="true" data-drag="key" data-p="${p.id}" data-id="${k.id}" title="拖动排序">${SVG.grip}</span>
     <span class="key-label">${escapeHtml(k.label || '密钥')}</span>
     <span class="key-value">${escapeHtml(shown)}</span>
     <button type="button" class="icon-btn" data-a="toggle-key" data-p="${p.id}" data-id="${k.id}" title="显示/隐藏">${eyeSvg(visibleKeys.has(k.id))}</button>
@@ -347,7 +349,7 @@ function providerHtml(p) {
   const modelsHtml = p.models.length
     ? `<div class="badges">${p.models.map((m) => modelBadgeHtml(p, m)).join('')}</div>`
     : '<div class="empty-tip">暂无模型</div>';
-  return `<div class="provider-card${collapsed ? ' collapsed' : ''}" draggable="true" data-drag="provider" data-id="${p.id}">
+  return `<div class="provider-card${collapsed ? ' collapsed' : ''}">
     <div class="provider-head">
       <button type="button" class="collapse-btn" data-a="toggle-card" data-p="${p.id}" title="展开/折叠">${SVG.chevron}</button>
       <span class="provider-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
@@ -357,6 +359,7 @@ function providerHtml(p) {
         <button type="button" class="icon-btn" data-a="edit-provider" data-p="${p.id}" title="编辑供应商">${SVG.pencil}</button>
         <button type="button" class="icon-btn danger" data-a="del-provider" data-p="${p.id}" title="删除供应商">${SVG.trash}</button>
       </div>
+      <button type="button" class="drag-handle" draggable="true" data-drag="provider" data-id="${p.id}" title="拖动排序">${SVG.grip}</button>
     </div>
     ${notes}
     <div class="provider-body">
@@ -553,11 +556,18 @@ function clearDragOver() {
 }
 
 function resolveDragTarget(el, type) {
-  let node = el && el.closest('[data-drag]');
-  if (node && type === 'provider' && node.dataset.drag === 'key') {
-    node = node.closest('[data-drag="provider"]');
+  let handle = el && el.closest('[data-drag]');
+  if (handle) return handle;
+  if (!el || !el.closest) return null;
+  if (type === 'provider') {
+    const card = el.closest('.provider-card');
+    return card ? card.querySelector('.drag-handle') : null;
   }
-  return node;
+  if (type === 'key') {
+    const row = el.closest('.key-row');
+    return row ? row.querySelector('.drag-handle') : null;
+  }
+  return null;
 }
 
 function fillProviderSelect(sel, selectedId) {
@@ -915,7 +925,8 @@ function init() {
     try {
       e.dataTransfer.setData('text/plain', dragItem.id);
     } catch {}
-    el.classList.add('dragging');
+    const highlight = dragItem.type === 'provider' ? el.closest('.provider-card') : el.closest('.key-row');
+    if (highlight) highlight.classList.add('dragging');
   });
 
   grid.addEventListener('dragover', (e) => {
