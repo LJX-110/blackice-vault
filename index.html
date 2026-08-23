@@ -3,12 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
-<title>锁玉函</title>
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#050507">
+<meta name="description" content="BLACKICE - personal encrypted terminal">
+<title>黑冰匣 BLACKICE</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BLACKICE">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<div id="crt" aria-hidden="true"></div>
+<canvas id="fx-canvas" aria-hidden="true"></canvas>
 
 <div id="lock-screen" class="lock-screen">
   <div class="lock-card">
@@ -19,8 +28,8 @@
         <circle cx="12" cy="14" r="1.8"/>
       </svg>
     </div>
-    <h1>锁玉函</h1>
-    <p class="subtitle">玉函藏钥 · 一锁玄机</p>
+    <h1 class="glitch" data-text="黑冰匣">黑冰匣</h1>
+    <p class="subtitle">BLACKICE TERMINAL // PERSONAL SECURE VAULT</p>
     <p id="lock-hint" class="hint"></p>
     <form id="lock-form">
       <div class="password-wrap">
@@ -36,176 +45,154 @@
       </div>
       <div id="lock-confirm-wrap" class="password-wrap hidden">
         <input type="password" id="lock-confirm" autocomplete="new-password" placeholder="确认主密码">
-        <button type="button" class="icon-btn" data-toggle="lock-confirm" title="显示密码">
-          <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-          </svg>
-          <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
-          </svg>
-        </button>
       </div>
-      <button type="submit" id="lock-btn" class="btn btn-primary btn-block"></button>
+      <button type="submit" id="lock-btn" class="btn btn-primary btn-block">UNLOCK</button>
       <p id="lock-error" class="error hidden"></p>
     </form>
   </div>
 </div>
 
 <div id="app" class="app hidden">
-  <header class="topbar">
-    <div class="brand">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+
+  <aside id="sidebar" class="sidebar">
+    <div class="side-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
         <rect x="3" y="8" width="18" height="12" rx="2"/>
         <path d="M7 8V6a5 5 0 0 1 10 0v2"/>
         <circle cx="12" cy="14" r="1.8"/>
       </svg>
-      <span>锁玉函</span>
+      <span class="brand-name">黑冰匣</span>
+      <span class="brand-sub">//VAULT.SYS</span>
     </div>
-    <div class="topbar-actions">
-      <span id="count" class="count"></span>
+
+    <nav class="side-nav" aria-label="保险库">
+      <p class="nav-label">VAULT</p>
+      <button type="button" class="nav-item active" data-view="all">ALL ENTRIES<span class="nc" id="c-all">0</span></button>
+      <button type="button" class="nav-item" data-view="api">API<span class="nc" id="c-api">0</span></button>
+      <button type="button" class="nav-item" data-view="account">ACCOUNT<span class="nc" id="c-account">0</span></button>
+      <button type="button" class="nav-item" data-view="note">SECURE NOTE<span class="nc" id="c-note">0</span></button>
+
+      <p class="nav-label">SYSTEM</p>
+      <button type="button" class="nav-item" id="nav-security">SECURITY</button>
+      <button type="button" class="nav-item" id="nav-backup">BACKUP</button>
+      <button type="button" class="nav-item" id="nav-settings">SETTINGS</button>
+
+      <p class="nav-label">SESSION</p>
+      <button type="button" class="nav-item" id="sound-toggle-btn">SOUND: ON</button>
+      <button type="button" class="nav-item" id="lock-btn-top">LOCK VAULT [L]</button>
+    </nav>
+
+    <div class="side-foot">
+      <span>AES-256-GCM</span><span class="fs">·</span><span>PBKDF2-SHA256</span><span class="fs">·</span><span>LOCAL ONLY</span>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="ws-bar">
       <div class="search-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="text" id="search-input" placeholder="搜索供应商 / 密钥 / 模型">
+        <input type="text" id="search-input" placeholder="搜索标题 / 字段 / 标签 / 内容…" autocomplete="off" aria-label="全局搜索">
+        <kbd class="kbd-hint">CTRL K</kbd>
       </div>
-      <button type="button" id="toggle-all-btn" class="btn btn-ghost"></button>
-      <button type="button" id="collapse-all-btn" class="btn btn-ghost" title="一键展开/收起全部供应商">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
-          <polyline points="6 4 12 10 18 4"/><polyline points="6 20 12 14 18 20"/>
-        </svg>
-        全部收起
-      </button>
-      <button type="button" id="backup-btn" class="btn btn-ghost">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-        数据与安全
-      </button>
-      <button type="button" id="pwd-btn" class="btn btn-ghost">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
-          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-        </svg>
-        修改密码
-      </button>
-      <button type="button" id="add-btn" class="btn btn-primary">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        新增供应商
-      </button>
-      <button type="button" id="lock-btn-top" class="btn btn-ghost" title="锁定，清除内存中的明文">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
-        锁定
-      </button>
-    </div>
-  </header>
+      <span id="count" class="count" aria-live="polite"></span>
+      <button type="button" id="add-btn" class="btn btn-primary">+ NEW ENTRY</button>
+    </header>
 
-  <main>
-    <div id="grid" class="grid"></div>
-    <div id="empty-state" class="empty hidden">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="44" height="44">
-        <rect x="3" y="8" width="18" height="12" rx="2"/>
-        <path d="M7 8V6a5 5 0 0 1 10 0v2"/>
-        <circle cx="12" cy="14" r="1.8"/>
-      </svg>
-      <p id="empty-text"></p>
-    </div>
-    <footer class="footer">数据仅以加密形式保存在本机浏览器（localStorage），主密码不会存储在任何地方</footer>
-  </main>
-</div>
-
-<div id="provider-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2 id="provider-modal-title">新增供应商</h2>
-    <form id="provider-form">
-      <div class="field">
-        <label for="p-name">供应商名称 <span class="required">*</span></label>
-        <input type="text" id="p-name" placeholder="如：OpenAI / DeepSeek / 阿里云" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="p-url">官网链接（点击直接跳转）</label>
-        <input type="text" id="p-url" placeholder="https://platform.openai.com" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="p-notes">备注</label>
-        <textarea id="p-notes" rows="2" placeholder="选填，如用途、到期时间等"></textarea>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" data-close="provider-modal">取消</button>
-        <button type="submit" class="btn btn-primary">保存</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div id="key-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2 id="key-modal-title">添加密钥</h2>
-    <form id="key-form">
-      <div class="field">
-        <label for="k-provider">所属供应商 <span class="required">*</span></label>
-        <select id="k-provider"></select>
-      </div>
-      <div class="field">
-        <label for="k-label">密钥标签</label>
-        <input type="text" id="k-label" placeholder="如：主账号 / 备用 / 项目A" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="k-key">API 密钥 <span class="required">*</span></label>
-        <div class="password-wrap">
-          <input type="password" id="k-key" autocomplete="new-password" placeholder="sk-...">
-          <button type="button" class="icon-btn" data-toggle="k-key" title="显示密钥">
-            <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-            <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
-            </svg>
-          </button>
+    <main class="layout">
+      <section id="entry-list" class="entry-list" aria-label="条目列表">
+        <div id="empty-state" class="empty hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="40" height="40">
+            <rect x="3" y="8" width="18" height="12" rx="2"/>
+            <path d="M7 8V6a5 5 0 0 1 10 0v2"/>
+            <circle cx="12" cy="14" r="1.8"/>
+          </svg>
+          <p id="empty-text"></p>
         </div>
+      </section>
+      <section id="detail-panel" class="detail-panel" aria-label="详情面板"></section>
+    </main>
+  </div>
+</div>
+
+<div id="entry-modal" class="modal-backdrop hidden">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title">
+    <h2 id="entry-modal-title">新增条目</h2>
+    <form id="entry-form" novalidate>
+      <div class="field" id="entry-type-wrap">
+        <label for="e-type">类型 <span class="required">*</span></label>
+        <select id="e-type">
+          <option value="api">API PROVIDER</option>
+          <option value="account">ACCOUNT</option>
+          <option value="note">SECURE NOTE</option>
+        </select>
       </div>
       <div class="field">
-        <label for="k-notes">备注</label>
-        <textarea id="k-notes" rows="2" placeholder="选填"></textarea>
+        <label for="e-title">标题 <span class="required">*</span></label>
+        <input type="text" id="e-title" autocomplete="off" placeholder="如：OpenAI / GitHub 主账号 / 部署记录">
+      </div>
+      <div class="field">
+        <label for="e-tags">标签</label>
+        <input type="text" id="e-tags" autocomplete="off" placeholder="逗号分隔，如：主力, 生产环境">
+      </div>
+      <div id="entry-fields"></div>
+      <div class="field" id="entry-desc-wrap">
+        <label for="e-desc">备注</label>
+        <textarea id="e-desc" rows="2" placeholder="选填"></textarea>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" data-close="key-modal">取消</button>
+        <button type="button" class="btn btn-ghost" data-close="entry-modal">取消</button>
         <button type="submit" class="btn btn-primary">保存</button>
       </div>
     </form>
   </div>
 </div>
 
-<div id="model-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2 id="model-modal-title">添加模型</h2>
-    <form id="model-form">
+<div id="security-modal" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="security-title">
+    <h2 id="security-title">SECURITY</h2>
+    <form id="pwd-form">
       <div class="field">
-        <label for="m-provider">所属供应商 <span class="required">*</span></label>
-        <select id="m-provider"></select>
+        <label for="p-old">当前主密码</label>
+        <input type="password" id="p-old" autocomplete="current-password" placeholder="当前主密码">
       </div>
       <div class="field">
-        <label for="m-name">模型名称 <span class="required">*</span></label>
-        <input type="text" id="m-name" placeholder="如：GPT-4o / Claude 3.5 Sonnet" autocomplete="off">
+        <label for="p-new">新密码（至少 8 位）</label>
+        <input type="password" id="p-new" autocomplete="new-password" placeholder="新主密码">
       </div>
       <div class="field">
-        <label for="m-notes">备注</label>
-        <input type="text" id="m-notes" placeholder="选填，如：主力模型" autocomplete="off">
+        <label for="p-confirm">确认新密码</label>
+        <input type="password" id="p-confirm" autocomplete="new-password" placeholder="再次输入新主密码">
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" data-close="model-modal">取消</button>
-        <button type="submit" class="btn btn-primary">保存</button>
+        <button type="button" class="btn btn-ghost" data-close="security-modal">取消</button>
+        <button type="submit" class="btn btn-primary">确认修改</button>
       </div>
     </form>
   </div>
 </div>
 
 <div id="backup-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2>数据与安全</h2>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backup-title">
+    <h2 id="backup-title">BACKUP</h2>
+    <div class="backup-actions">
+      <button type="button" id="export-btn" class="btn btn-ghost">导出加密备份</button>
+      <label class="btn btn-ghost import-label">
+        导入备份
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </label>
+    </div>
+    <p class="hint-text">备份文件为密文，仅可用备份库的主密码解密。导入会覆盖当前全部数据并锁定应用。</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close="backup-modal">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings-modal" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <h2 id="settings-title">SETTINGS</h2>
     <div class="field">
       <label for="auto-lock">自动锁屏</label>
       <select id="auto-lock">
@@ -215,80 +202,64 @@
         <option value="30">闲置 30 分钟锁定</option>
       </select>
     </div>
-    <div class="divider"></div>
     <div class="field">
-      <label>备份</label>
-      <div class="backup-actions">
-        <button type="button" id="export-btn" class="btn btn-ghost">导出加密备份</button>
-        <label class="btn btn-ghost import-label">
-          导入备份
-          <input type="file" id="import-file" accept=".json,application/json" hidden>
-        </label>
-      </div>
-      <p class="hint-text">备份文件为密文，仅可用备份库的主密码解密。导入会覆盖当前全部数据并锁定应用，用于换设备迁移。</p>
+      <label for="set-sound">音效</label>
+      <select id="set-sound">
+        <option value="on">开启</option>
+        <option value="off">关闭</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="set-fx">粒子特效</label>
+      <select id="set-fx">
+        <option value="on">开启</option>
+        <option value="off">关闭</option>
+      </select>
     </div>
     <div class="modal-actions">
-      <button type="button" class="btn btn-ghost" data-close="backup-modal">关闭</button>
+      <button type="button" class="btn btn-ghost" data-close="settings-modal">关闭</button>
     </div>
   </div>
 </div>
 
-<div id="pwd-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2>修改主密码</h2>
-    <form id="pwd-form">
-      <div class="field">
-        <label for="p-old">当前密码</label>
-        <div class="password-wrap">
-          <input type="password" id="p-old" autocomplete="current-password" placeholder="当前主密码">
-          <button type="button" class="icon-btn" data-toggle="p-old" title="显示密码">
-            <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-            <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="p-new">新密码（至少 8 位）</label>
-        <div class="password-wrap">
-          <input type="password" id="p-new" autocomplete="new-password" placeholder="新主密码">
-          <button type="button" class="icon-btn" data-toggle="p-new" title="显示密码">
-            <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-            <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="p-confirm">确认新密码</label>
-        <div class="password-wrap">
-          <input type="password" id="p-confirm" autocomplete="new-password" placeholder="再次输入新主密码">
-          <button type="button" class="icon-btn" data-toggle="p-confirm" title="显示密码">
-            <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-            <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" data-close="pwd-modal">取消</button>
-        <button type="submit" class="btn btn-primary">确认修改</button>
-      </div>
-    </form>
+<div id="confirm-modal" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">确认</h2>
+    <p id="confirm-message"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="confirm-cancel">取消</button>
+      <button type="button" class="btn btn-primary" id="confirm-ok">确定</button>
+    </div>
   </div>
+</div>
+
+<div id="palette-backdrop" class="palette-backdrop hidden">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="命令面板">
+    <input type="text" id="pal-input" placeholder="输入命令或搜索条目…" autocomplete="off">
+    <div id="pal-list" class="pal-list"></div>
+  </div>
+</div>
+
+<div id="boot-screen" class="hidden">
+  <pre id="boot-lines" aria-live="polite"></pre>
 </div>
 
 <div id="toast" class="toast hidden"></div>
 
-<script src="app.js?v=3"></script>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  if (location.protocol === 'file:') {
+    const h = document.getElementById('lock-hint');
+    if (h) h.textContent = '请通过 HTTPS（如 GitHub Pages）或本地服务器访问本终端，双击打开的 file:// 无法加载模块。';
+    return;
+  }
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+});
+</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
