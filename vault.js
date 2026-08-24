@@ -136,7 +136,7 @@ function getStorageKey(name) {
   return map[name];
 }
 
-function readLocal(name) {
+export function readLocal(name) {
   try {
     return localStorage.getItem(getStorageKey(name));
   } catch {
@@ -144,7 +144,7 @@ function readLocal(name) {
   }
 }
 
-function writeLocal(name, value) {
+export function writeLocal(name, value) {
   try {
     localStorage.setItem(getStorageKey(name), value);
     return true;
@@ -153,7 +153,7 @@ function writeLocal(name, value) {
   }
 }
 
-function removeLocal(name) {
+export function removeLocal(name) {
   try {
     localStorage.removeItem(getStorageKey(name));
   } catch {}

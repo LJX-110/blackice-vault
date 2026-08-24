@@ -9,6 +9,7 @@
 <title>黑冰匣 BLACKICE</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="BLACKICE">
@@ -17,7 +18,9 @@
 <body>
 
 <div id="crt" aria-hidden="true"></div>
-<canvas id="fx-canvas" aria-hidden="true"></canvas>
+<div id="amb" aria-hidden="true"></div>
+<canvas id="rain" aria-hidden="true"></canvas>
+<div id="hud" aria-hidden="true"><div class="hud-x"></div><div class="hud-y"></div><div class="hud-pos">X:0000 Y:0000</div></div>
 
 <div id="lock-screen" class="lock-screen">
   <div class="lock-card">
@@ -61,25 +64,25 @@
         <path d="M7 8V6a5 5 0 0 1 10 0v2"/>
         <circle cx="12" cy="14" r="1.8"/>
       </svg>
-      <span class="brand-name">黑冰匣</span>
+      <span class="brand-name glitch" data-text="黑冰匣">黑冰匣</span>
       <span class="brand-sub">//VAULT.SYS</span>
     </div>
 
     <nav class="side-nav" aria-label="保险库">
-      <p class="nav-label">VAULT</p>
-      <button type="button" class="nav-item active" data-view="all">ALL ENTRIES<span class="nc" id="c-all">0</span></button>
-      <button type="button" class="nav-item" data-view="api">API<span class="nc" id="c-api">0</span></button>
-      <button type="button" class="nav-item" data-view="account">ACCOUNT<span class="nc" id="c-account">0</span></button>
-      <button type="button" class="nav-item" data-view="note">SECURE NOTE<span class="nc" id="c-note">0</span></button>
+      <p class="nav-label">/// 保险库</p>
+      <button type="button" class="nav-item active" data-view="all" data-text="全部条目">全部条目<span class="nc" id="c-all">0</span></button>
+      <button type="button" class="nav-item" data-view="api" data-text="API">API<span class="nc" id="c-api">0</span></button>
+      <button type="button" class="nav-item" data-view="account" data-text="账号">账号<span class="nc" id="c-account">0</span></button>
+      <button type="button" class="nav-item" data-view="note" data-text="安全笔记">安全笔记<span class="nc" id="c-note">0</span></button>
 
-      <p class="nav-label">SYSTEM</p>
-      <button type="button" class="nav-item" id="nav-security">SECURITY</button>
-      <button type="button" class="nav-item" id="nav-backup">BACKUP</button>
-      <button type="button" class="nav-item" id="nav-settings">SETTINGS</button>
+      <p class="nav-label">/// 系统</p>
+      <button type="button" class="nav-item" id="nav-security" data-text="安全设置">安全设置</button>
+      <button type="button" class="nav-item" id="nav-backup" data-text="数据备份">数据备份</button>
+      <button type="button" class="nav-item" id="nav-settings" data-text="偏好设置">偏好设置</button>
 
-      <p class="nav-label">SESSION</p>
-      <button type="button" class="nav-item" id="sound-toggle-btn">SOUND: ON</button>
-      <button type="button" class="nav-item" id="lock-btn-top">LOCK VAULT [L]</button>
+      <p class="nav-label">/// 会话</p>
+      <button type="button" class="nav-item" id="sound-toggle-btn" data-text="音效：开">音效：开</button>
+      <button type="button" class="nav-item" id="lock-btn-top" data-text="锁定保险库 [L]">锁定保险库 [L]</button>
     </nav>
 
     <div class="side-foot">
@@ -97,7 +100,8 @@
         <kbd class="kbd-hint">CTRL K</kbd>
       </div>
       <span id="count" class="count" aria-live="polite"></span>
-      <button type="button" id="add-btn" class="btn btn-primary">+ NEW ENTRY</button>
+      <button type="button" id="layout-btn" class="btn btn-ghost" title="切换布局模式">布局：自动</button>
+      <button type="button" id="add-btn" class="btn btn-primary">＋ 新增条目</button>
     </header>
 
     <main class="layout">
@@ -117,16 +121,16 @@
 </div>
 
 <div id="entry-modal" class="modal-backdrop hidden">
-  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title">
+  <div class="modal modal-wide m-yellow" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title">
     <h2 id="entry-modal-title">新增条目</h2>
     <form id="entry-form" novalidate>
       <div class="field" id="entry-type-wrap">
-        <label for="e-type">类型 <span class="required">*</span></label>
-        <select id="e-type">
-          <option value="api">API PROVIDER</option>
-          <option value="account">ACCOUNT</option>
-          <option value="note">SECURE NOTE</option>
-        </select>
+        <span class="field-label">类型 <span class="required">*</span></span>
+        <div id="e-type" class="seg" role="radiogroup" aria-label="类型">
+          <button type="button" class="seg-btn on" data-val="api">API</button>
+          <button type="button" class="seg-btn" data-val="account">账号</button>
+          <button type="button" class="seg-btn" data-val="note">安全笔记</button>
+        </div>
       </div>
       <div class="field">
         <label for="e-title">标题 <span class="required">*</span></label>
@@ -150,20 +154,38 @@
 </div>
 
 <div id="security-modal" class="modal-backdrop hidden">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="security-title">
-    <h2 id="security-title">SECURITY</h2>
+  <div class="modal m-red" role="dialog" aria-modal="true" aria-labelledby="security-title">
+    <h2 id="security-title">安全设置</h2>
     <form id="pwd-form">
       <div class="field">
         <label for="p-old">当前主密码</label>
-        <input type="password" id="p-old" autocomplete="current-password" placeholder="当前主密码">
+        <div class="password-wrap">
+          <input type="password" id="p-old" autocomplete="current-password" placeholder="当前主密码">
+          <button type="button" class="icon-btn" data-toggle="p-old" title="显示密码">
+            <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
       </div>
       <div class="field">
         <label for="p-new">新密码（至少 8 位）</label>
-        <input type="password" id="p-new" autocomplete="new-password" placeholder="新主密码">
+        <div class="password-wrap">
+          <input type="password" id="p-new" autocomplete="new-password" placeholder="新主密码">
+          <button type="button" class="icon-btn" data-toggle="p-new" title="显示密码">
+            <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
       </div>
       <div class="field">
         <label for="p-confirm">确认新密码</label>
-        <input type="password" id="p-confirm" autocomplete="new-password" placeholder="再次输入新主密码">
+        <div class="password-wrap">
+          <input type="password" id="p-confirm" autocomplete="new-password" placeholder="再次输入新主密码">
+          <button type="button" class="icon-btn" data-toggle="p-confirm" title="显示密码">
+            <svg class="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="i-eye-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" data-close="security-modal">取消</button>
@@ -174,8 +196,8 @@
 </div>
 
 <div id="backup-modal" class="modal-backdrop hidden">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backup-title">
-    <h2 id="backup-title">BACKUP</h2>
+  <div class="modal m-yellow" role="dialog" aria-modal="true" aria-labelledby="backup-title">
+    <h2 id="backup-title">数据备份</h2>
     <div class="backup-actions">
       <button type="button" id="export-btn" class="btn btn-ghost">导出加密备份</button>
       <label class="btn btn-ghost import-label">
@@ -191,30 +213,52 @@
 </div>
 
 <div id="settings-modal" class="modal-backdrop hidden">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-    <h2 id="settings-title">SETTINGS</h2>
+  <div class="modal m-blue" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <h2 id="settings-title">偏好设置</h2>
     <div class="field">
-      <label for="auto-lock">自动锁屏</label>
-      <select id="auto-lock">
-        <option value="0">不自动锁定</option>
-        <option value="5">闲置 5 分钟锁定</option>
-        <option value="15">闲置 15 分钟锁定</option>
-        <option value="30">闲置 30 分钟锁定</option>
-      </select>
+      <span class="field-label">自动锁屏</span>
+      <div id="auto-lock" class="seg" role="radiogroup" aria-label="自动锁屏">
+        <button type="button" class="seg-btn on" data-val="0">不锁</button>
+        <button type="button" class="seg-btn" data-val="5">5 分</button>
+        <button type="button" class="seg-btn" data-val="15">15 分</button>
+        <button type="button" class="seg-btn" data-val="30">30 分</button>
+      </div>
     </div>
     <div class="field">
-      <label for="set-sound">音效</label>
-      <select id="set-sound">
-        <option value="on">开启</option>
-        <option value="off">关闭</option>
-      </select>
+      <span class="field-label">音效</span>
+      <div id="set-sound" class="seg" role="radiogroup" aria-label="音效">
+        <button type="button" class="seg-btn on" data-val="on">开启</button>
+        <button type="button" class="seg-btn" data-val="off">关闭</button>
+      </div>
     </div>
     <div class="field">
-      <label for="set-fx">粒子特效</label>
-      <select id="set-fx">
-        <option value="on">开启</option>
-        <option value="off">关闭</option>
-      </select>
+      <span class="field-label">终端环境嗡鸣</span>
+      <div id="set-hum" class="seg" role="radiogroup" aria-label="终端环境嗡鸣">
+        <button type="button" class="seg-btn" data-val="on">开启</button>
+        <button type="button" class="seg-btn on" data-val="off">关闭</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">布局模式</span>
+      <div id="set-layout" class="seg" role="radiogroup" aria-label="布局模式">
+        <button type="button" class="seg-btn on" data-val="auto">自动</button>
+        <button type="button" class="seg-btn" data-val="desktop">桌面</button>
+        <button type="button" class="seg-btn" data-val="mobile">移动</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">环境动效</span>
+      <div id="set-fx" class="seg" role="radiogroup" aria-label="环境动效">
+        <button type="button" class="seg-btn on" data-val="on">开启</button>
+        <button type="button" class="seg-btn" data-val="off">关闭</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">数据雨（红色）</span>
+      <div id="set-rain" class="seg" role="radiogroup" aria-label="数据雨">
+        <button type="button" class="seg-btn on" data-val="on">开启</button>
+        <button type="button" class="seg-btn" data-val="off">关闭</button>
+      </div>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" data-close="settings-modal">关闭</button>
@@ -223,7 +267,7 @@
 </div>
 
 <div id="confirm-modal" class="modal-backdrop hidden">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div class="modal m-red" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
     <h2 id="confirm-title">确认</h2>
     <p id="confirm-message"></p>
     <div class="modal-actions">
@@ -247,15 +291,19 @@
 <div id="toast" class="toast hidden"></div>
 
 <script>
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('error', function (ev) {
+  var h = document.getElementById('lock-hint');
+  if (h) h.textContent = '加载异常：' + (ev.message || '资源加载失败') + ' —— 请确认 crypto.js / vault.js / app.js 已全部上传，然后 Ctrl+F5 强刷';
+}, true);
+window.addEventListener('DOMContentLoaded', function () {
   if (location.protocol === 'file:') {
-    const h = document.getElementById('lock-hint');
+    var h = document.getElementById('lock-hint');
     if (h) h.textContent = '请通过 HTTPS（如 GitHub Pages）或本地服务器访问本终端，双击打开的 file:// 无法加载模块。';
     return;
   }
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
     });
   }
 });

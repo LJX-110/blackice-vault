@@ -22,6 +22,7 @@ let dragId = null;
 let palIndex = 0;
 let palItems = [];
 let soundEnabled = true;
+let humEnabled = false;
 let fxEnabled = true;
 const revealSet = new Set();
 const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -61,6 +62,27 @@ const settingsModal = $('settings-modal');
 const autoLockSel = $('auto-lock');
 const setSound = $('set-sound');
 const setFx = $('set-fx');
+const setHum = $('set-hum');
+const setRain = $('set-rain');
+
+function segVal(id) {
+  const el = $(id);
+  if (!el) return '';
+  const b = el.querySelector('.seg-btn.on');
+  return b ? b.dataset.val : '';
+}
+function setSeg(id, val) {
+  const el = $(id);
+  if (!el) return;
+  el.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.val === String(val)));
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('.seg-btn');
+  if (!b || b.classList.contains('on') || !b.parentElement.classList.contains('seg')) return;
+  b.parentElement.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+  b.parentElement.dispatchEvent(new CustomEvent('segchange', { detail: b.dataset.val }));
+});
+const setLayoutSel = $('set-layout');
 
 const toastEl = $('toast');
 const palBackdrop = $('palette-backdrop');
@@ -69,8 +91,19 @@ const palList = $('pal-list');
 
 const TYPES = {
   api: { tag: 'API', cls: 't-api' },
-  account: { tag: 'ACCOUNT', cls: 't-account' },
-  note: { tag: 'NOTE', cls: 't-note' }
+  account: { tag: '账号', cls: 't-account' },
+  note: { tag: '笔记', cls: 't-note' }
+};
+
+const FIELD_DISPLAY = {
+  'Endpoint': '端点地址',
+  'API Keys': 'API 密钥',
+  'Models': '模型列表',
+  'Username': '用户名',
+  'Email': '邮箱',
+  'Password': '密码',
+  'URL': '网址',
+  'Content': '内容'
 };
 
 const SCHEMAS = {
@@ -99,7 +132,7 @@ function escapeHtml(s) {
 function fmtDate(iso) {
   const d = iso ? new Date(iso) : new Date();
   if (isNaN(d)) return '';
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
 
 function slugOf(t) {
@@ -280,103 +313,45 @@ document.addEventListener('pointerdown', function (e) {
   SFX.click();
 });
 
-const FX = (function () {
-  let canvas = null;
-  let c2d = null;
-  let parts = [];
-  let raf = null;
-  let mx = 0, my = 0;
-  let enabled = true;
-  const COLORS = ['255,0,61', '252,238,10', '0,229,255'];
-  function resize() {
-    if (!canvas) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  function spawn() {
-    parts = [];
-    const count = Math.min(90, Math.max(28, Math.floor(window.innerWidth * window.innerHeight / 20000)));
-    for (let i = 0; i < count; i++) {
-      parts.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        r: Math.random() * 1.6 + 0.5,
-        vx: (Math.random() - 0.5) * 0.16,
-        vy: (Math.random() - 0.5) * 0.16,
-        a: Math.random() * 0.32 + 0.1,
-        c: COLORS[i % COLORS.length],
-        ph: Math.random() * Math.PI * 2
-      });
+const HUM = (function () {
+  let ctx = null;
+  let nodes = null;
+  function ensure() {
+    if (!ctx) {
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
     }
+    if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
+    return ctx;
   }
-  function tick(t) {
-    if (!enabled) { raf = null; return; }
-    c2d.clearRect(0, 0, canvas.width, canvas.height);
-    const px = (mx - window.innerWidth / 2) * 0.01;
-    const py = (my - window.innerHeight / 2) * 0.01;
-    const LINK = 105, L2 = LINK * LINK;
-    c2d.lineWidth = 1;
-    for (let i = 0; i < parts.length; i++) {
-      for (let j = i + 1; j < parts.length; j++) {
-        const dx = parts[i].x - parts[j].x;
-        const dy = parts[i].y - parts[j].y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < L2) {
-          c2d.strokeStyle = 'rgba(0,229,255,' + ((1 - Math.sqrt(d2) / LINK) * 0.08).toFixed(3) + ')';
-          c2d.beginPath();
-          c2d.moveTo(parts[i].x + px, parts[i].y + py);
-          c2d.lineTo(parts[j].x + px, parts[j].y + py);
-          c2d.stroke();
-        }
+  function build(c) {
+    const g = c.createGain();
+    g.gain.value = 0.0001;
+    const o1 = c.createOscillator(); o1.type = 'sine'; o1.frequency.value = 54;
+    const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = 55.4;
+    const o3 = c.createOscillator(); o3.type = 'triangle'; o3.frequency.value = 108;
+    const g3 = c.createGain(); g3.gain.value = 0.22;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 240; f.Q.value = 0.5;
+    const lfo = c.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.13;
+    const lg = c.createGain(); lg.gain.value = 0.014;
+    lfo.connect(lg); lg.connect(g.gain);
+    o1.connect(g); o2.connect(g); o3.connect(g3); g3.connect(f); f.connect(g);
+    g.connect(c.destination);
+    [o1, o2, o3, lfo].forEach((x) => x.start());
+    return { g };
+  }
+  function set(on) {
+    if (!on) {
+      if (nodes && ctx) {
+        try { nodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5); } catch (e) {}
       }
+      return;
     }
-    for (const p of parts) {
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < -10) p.x = window.innerWidth + 10; else if (p.x > window.innerWidth + 10) p.x = -10;
-      if (p.y < -10) p.y = window.innerHeight + 10; else if (p.y > window.innerHeight + 10) p.y = -10;
-      const tw = 0.7 + 0.3 * Math.sin(t * 0.0012 + p.ph);
-      c2d.beginPath();
-      c2d.arc(p.x + px * p.r * 2.5, p.y + py * p.r * 2.5, p.r, 0, 6.2832);
-      c2d.fillStyle = 'rgba(' + p.c + ',' + (p.a * tw).toFixed(3) + ')';
-      c2d.fill();
-    }
-    raf = requestAnimationFrame(tick);
+    const c = ensure();
+    if (!c) return;
+    if (!nodes) nodes = build(c);
+    try { nodes.g.gain.setTargetAtTime(0.055, c.currentTime, 0.8); } catch (e) {}
   }
-  function start() {
-    if (!c2d || raf || !enabled) return;
-    raf = requestAnimationFrame(tick);
-  }
-  function stop() {
-    if (raf) { cancelAnimationFrame(raf); raf = null; }
-    if (c2d) c2d.clearRect(0, 0, canvas.width, canvas.height);
-  }
-  function applyClass() {
-    if (canvas) canvas.classList.toggle('fx-off', !enabled);
-  }
-  function init() {
-    if (REDUCED_MOTION) enabled = false;
-    try {
-      canvas = document.getElementById('fx-canvas');
-      if (!canvas) return;
-      c2d = canvas.getContext('2d');
-      if (!c2d) return;
-      resize();
-      spawn();
-      window.addEventListener('resize', () => { resize(); spawn(); });
-      window.addEventListener('pointermove', (e) => { mx = e.clientX; my = e.clientY; }, { passive: true });
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) stop(); else start();
-      });
-      applyClass();
-      start();
-    } catch (err) {}
-  }
-  function setEnabled(v) {
-    enabled = !!v && !REDUCED_MOTION;
-    applyClass();
-    if (enabled) start(); else stop();
-  }
-  return { init, setEnabled };
+  return { set };
 })();
 
 const BOOT_LINES = [
@@ -434,7 +409,7 @@ function updateLockScreen() {
   lockHint.textContent = isSetup
     ? '首次使用：设置主密码，本地加密你的全部条目。密码不可找回。'
     : '输入主密码，接入 BLACKICE 终端';
-  lockBtn.textContent = isSetup ? 'INITIALIZE' : 'UNLOCK';
+  lockBtn.textContent = isSetup ? '初始化并进入' : '解锁';
   lockConfirmWrap.classList.toggle('hidden', !isSetup);
   lockError.classList.add('hidden');
   lockBusy(false);
@@ -533,17 +508,31 @@ function enterApp() {
 }
 
 function applySessionPrefs() {
-  const st = Object.assign({ autoLock: 0, sound: 'on', fx: 'on' }, getSettings());
+  const st = Object.assign({ autoLock: 0, sound: 'on', fx: 'on', hum: 'off', layout: 'auto' }, getSettings());
   soundEnabled = st.sound !== 'off';
   fxEnabled = st.fx !== 'off';
+  humEnabled = st.hum === 'on' && !!cryptoKey;
+  layoutMode = ['auto', 'desktop', 'mobile'].includes(st.layout) ? st.layout : 'auto';
   syncSoundUI();
-  FX.setEnabled(fxEnabled);
+  syncHumUI();
+  applyAmbient(fxEnabled);
+  applyRain(st.rain !== 'off');
+  HUM.set(humEnabled);
+  applyLayoutMode();
+  syncLayoutUI();
 }
 
 function syncSoundUI() {
   const b = $('sound-toggle-btn');
-  if (b) b.textContent = 'SOUND: ' + (soundEnabled ? 'ON' : 'OFF');
-  if (setSound) setSound.value = soundEnabled ? 'on' : 'off';
+  if (b) {
+    b.textContent = '音效：' + (soundEnabled ? '开' : '关');
+    b.dataset.text = b.textContent;
+  }
+  if (setSound) setSeg('set-sound', soundEnabled ? 'on' : 'off');
+}
+
+function syncHumUI() {
+  if (setHum) setSeg('set-hum', humEnabled ? 'on' : 'off');
 }
 
 function lockNow() {
@@ -566,6 +555,129 @@ function lockNow() {
 }
 
 let idleTimer = null;
+function applyAmbient(on) {
+  document.body.classList.toggle('amb-off', !on);
+}
+
+let rainEnabled = true;
+const Rain = (() => {
+  const cv = $('rain');
+  if (!cv || !cv.getContext) return { set() {} };
+  const ctx = cv.getContext('2d');
+  const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789<>[]{}#$*+=';
+  let cols = [], W = 0, H = 0, dpr = 1, last = 0, on = false;
+
+  function spawn(x, anyY) {
+    return { x, y: anyY ? Math.random() * H : -20, sp: (0.45 + Math.random() * 1.0) * 15 * dpr };
+  }
+  function size() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.width = Math.max(1, Math.floor(innerWidth * dpr));
+    H = cv.height = Math.max(1, Math.floor(innerHeight * dpr));
+    const step = 18 * dpr;
+    cols = Array.from({ length: Math.ceil(W / step) }, (_, i) => spawn(i * step, true));
+    ctx.fillStyle = '#050507';
+    ctx.fillRect(0, 0, W, H);
+  }
+  function frame(t) {
+    if (!on) return;
+    requestAnimationFrame(frame);
+    if (t - last < 33) return;
+    last = t;
+    ctx.fillStyle = 'rgba(5,5,7,0.14)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = Math.round(13 * dpr) + 'px monospace';
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i];
+      ctx.fillStyle = Math.random() < 0.06 ? 'rgba(255,70,95,0.5)' : 'rgba(255,0,61,0.30)';
+      ctx.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0], c.x, c.y);
+      c.y += c.sp;
+      if (c.y - 20 > H) cols[i] = spawn(c.x, false);
+    }
+  }
+  function set(v) {
+    const want = !!v && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    rainEnabled = want;
+    if (want && !on) { on = true; size(); last = 0; requestAnimationFrame(frame); }
+    else if (!want) on = false;
+  }
+  window.addEventListener('resize', () => { if (on) size(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { on = false; }
+    else if (rainEnabled && !on) { on = true; last = 0; requestAnimationFrame(frame); }
+  });
+  return { set };
+})();
+function applyRain(on) { Rain.set(on); }
+
+(() => {
+  const hud = $('hud');
+  if (!hud) return;
+  if (window.matchMedia('(pointer: coarse)').matches) return;
+  const hx = hud.querySelector('.hud-x');
+  const hy = hud.querySelector('.hud-y');
+  const pos = hud.querySelector('.hud-pos');
+  let x = innerWidth * 0.5, y = innerHeight * 0.4, tick = false;
+  window.addEventListener('mousemove', (e) => {
+    x = e.clientX; y = e.clientY;
+    if (tick) return;
+    tick = true;
+    requestAnimationFrame(() => {
+      tick = false;
+      hx.style.transform = 'translateY(' + y + 'px)';
+      hy.style.transform = 'translateX(' + x + 'px)';
+      pos.textContent = 'X:' + String(Math.round(x)).padStart(4, '0') + ' Y:' + String(Math.round(y)).padStart(4, '0');
+      const px = Math.min(x + 14, innerWidth - 110);
+      const py = Math.min(y + 14, innerHeight - 30);
+      pos.style.transform = 'translate(' + px + 'px,' + py + 'px)';
+    });
+  }, { passive: true });
+})();
+
+(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const SEL = '.entry-item, .d-field';
+  document.addEventListener('mousemove', (e) => {
+    const t = e.target;
+    const el = t && t.closest && t.closest(SEL);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = 'perspective(720px) rotateX(' + (-py * 6).toFixed(2) + 'deg) rotateY(' + (px * 6).toFixed(2) + 'deg) translateY(-1px)';
+  }, { passive: true });
+  document.addEventListener('pointerout', (e) => {
+    const t = e.target;
+    const el = t && t.closest && t.closest(SEL);
+    if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) el.style.transform = '';
+  }, { passive: true });
+})();
+
+let layoutMode = 'auto';
+function applyLayoutMode() {
+  const mobile = layoutMode === 'mobile' ||
+    (layoutMode === 'auto' && window.matchMedia('(max-width: 860px)').matches);
+  appScreen.classList.toggle('compact', mobile);
+}
+function syncLayoutUI() {
+  const b = $('layout-btn');
+  const label = layoutMode === 'auto' ? '自动' : layoutMode === 'desktop' ? '桌面' : '移动';
+  if (b) b.textContent = '布局：' + label;
+  if (setLayoutSel) setSeg('set-layout', layoutMode);
+}
+function setLayoutMode(mode) {
+  layoutMode = ['auto', 'desktop', 'mobile'].includes(mode) ? mode : 'auto';
+  const st = getSettings();
+  st.layout = layoutMode;
+  saveSettings(st);
+  applyLayoutMode();
+  syncLayoutUI();
+}
+function cycleLayout() {
+  const order = ['auto', 'desktop', 'mobile'];
+  setLayoutMode(order[(order.indexOf(layoutMode) + 1) % order.length]);
+  toast('布局：' + (layoutMode === 'auto' ? '自动' : layoutMode === 'desktop' ? '桌面' : '移动'));
+}
 function resetIdle() {
   clearTimeout(idleTimer);
   const minutes = Number(getSettings().autoLock) || 0;
@@ -631,7 +743,7 @@ function entryItemHtml(e, i) {
     const len = cf && typeof cf.value === 'string' ? cf.value.replace(/\s/g, '').length : 0;
     stat = `${len} CHARS`;
   }
-  return `<div class="entry-item${sel}" data-id="${e.id}" style="animation-delay:${Math.min(i * 35, 240)}ms">
+  return `<div class="entry-item${sel} ${meta.cls}" data-id="${e.id}" style="animation-delay:${Math.min(i * 35, 240)}ms">
     <div class="e-row1">
       <span class="e-type ${meta.cls}">${meta.tag}</span>
       <span class="e-title">${escapeHtml(e.title)}</span>
@@ -648,7 +760,7 @@ function secretKey(eid, fIdx, rIdx) {
 }
 
 function fieldRowHtml(e, f, fIdx) {
-  const name = escapeHtml(f.name.toUpperCase());
+  const name = escapeHtml((FIELD_DISPLAY[f.name] || f.name).toUpperCase());
   const wide = ['textarea'].includes(f.type) || f.type === 'keys' || f.type === 'list' ? ' wide' : '';
   let body = '';
   if (f.type === 'keys') {
@@ -701,9 +813,8 @@ function renderDetail() {
   const e = findEntry(selectedId);
   if (!e) {
     detailPanel.innerHTML = `<div class="d-empty">
-      <p>NO ENTRY SELECTED</p>
-      <p>从左侧列表选择条目</p>
-      <p>CTRL K 打开命令面板</p>
+      <p>未选中任何条目</p>
+      <p>从左侧列表选择，或按 CTRL K 呼出命令面板</p>
     </div>`;
     return;
   }
@@ -712,22 +823,22 @@ function renderDetail() {
     ? `<div class="d-tags">${e.metadata.tags.map((t) => `<span class="chip">#${escapeHtml(t)}</span>`).join('')}</div>`
     : '';
   const descHtml = e.metadata.description
-    ? `<div class="d-grid" style="margin-top:12px"><div class="d-field wide"><div class="d-name">DESCRIPTION</div><div class="d-value"><pre>${escapeHtml(e.metadata.description)}</pre></div></div></div>`
+    ? `<div class="d-grid" style="margin-top:12px"><div class="d-field wide"><div class="d-name">备注</div><div class="d-value"><pre>${escapeHtml(e.metadata.description)}</pre></div></div></div>`
     : '';
   const fieldsHtml = e.fields.map((f, i) => fieldRowHtml(e, f, i)).join('');
   detailPanel.innerHTML = `
     <div class="d-head">
-      <button type="button" class="back-btn" data-a="back">← BACK TO LIST</button>
+      <button type="button" class="back-btn" data-a="back">← 返回列表</button>
       <div class="d-path">BLACKICE://${escapeHtml(slugOf(e.title))}</div>
       <div class="d-title-row">
         <h2 class="d-title">${escapeHtml(e.title)}</h2>
         <button type="button" class="icon-btn" data-a="fav" title="收藏置顶" aria-pressed="${!!e.metadata.favorite}" style="${e.metadata.favorite ? 'color:var(--yellow)' : ''}">${SVG.star}</button>
         <div class="d-actions">
-          <button type="button" class="btn-mini" data-a="edit">EDIT</button>
-          <button type="button" class="btn-mini danger" data-a="delete">DELETE</button>
+          <button type="button" class="btn-mini" data-a="edit">编辑</button>
+          <button type="button" class="btn-mini danger" data-a="delete">删除</button>
         </div>
       </div>
-      <div class="d-tags"><span class="chip ${meta.cls}" style="background:none;border-color:var(--border-w);color:${meta.cls === 't-api' ? 'var(--yellow)' : meta.cls === 't-account' ? 'var(--blue)' : 'var(--red)'}">${meta.tag}</span><span class="chip">STATUS: ACTIVE</span><span class="chip">UPDATED ${fmtDate(e.metadata.updatedAt)}</span><span class="chip">CREATED ${fmtDate(e.metadata.createdAt)}</span>${e.metadata.tags.map((t) => `<span class="chip">#${escapeHtml(t)}</span>`).join('')}</div>
+      <div class="d-tags"><span class="chip" style="background:none;border-color:var(--border-w);color:${meta.cls === 't-api' ? 'var(--yellow)' : meta.cls === 't-account' ? 'var(--blue)' : 'var(--red)'}">${meta.tag}</span><span class="chip">状态 · 激活</span><span class="chip">更新 ${fmtDate(e.metadata.updatedAt)}</span><span class="chip">创建 ${fmtDate(e.metadata.createdAt)}</span>${e.metadata.tags.map((t) => `<span class="chip">#${escapeHtml(t)}</span>`).join('')}</div>
     </div>
     <div class="d-grid">${fieldsHtml}</div>
     ${descHtml}
@@ -741,14 +852,17 @@ function renderList() {
   const empty = $('empty-state');
   if (!list.length) {
     emptyText.textContent = searchInput.value.trim()
-      ? '> NO MATCH IN VAULT'
-      : '> VAULT EMPTY —— 点击右上角 NEW ENTRY 写入第一条数据';
+      ? '库中没有匹配的条目'
+      : '保险库为空 —— 点击右上角「＋ 新增条目」写入第一条数据';
     empty.classList.remove('hidden');
   } else {
     empty.classList.add('hidden');
   }
   const rows = items ? items : '';
   entryListEl.innerHTML = rows;
+  Array.from(entryListEl.children).forEach((el, i) => {
+    if (el.classList && el.classList.contains('entry-item')) el.style.animationDelay = Math.min(i * 26, 260) + 'ms';
+  });
   entryListEl.appendChild(empty);
 }
 
@@ -776,10 +890,13 @@ function pOldFocus() {
 }
 
 function openSettings() {
-  const st = Object.assign({ autoLock: 0, sound: 'on', fx: 'on' }, getSettings());
-  autoLockSel.value = String(st.autoLock || 0);
-  setSound.value = soundEnabled ? 'on' : 'off';
-  setFx.value = fxEnabled ? 'on' : 'off';
+  const st = Object.assign({ autoLock: 0, sound: 'on', fx: 'on', hum: 'off', layout: 'auto' }, getSettings());
+  setSeg('auto-lock', st.autoLock || 0);
+  setSeg('set-sound', soundEnabled ? 'on' : 'off');
+  setSeg('set-hum', humEnabled ? 'on' : 'off');
+  setSeg('set-fx', fxEnabled ? 'on' : 'off');
+  if (setRain) setSeg('set-rain', getSettings().rain === 'off' ? 'off' : 'on');
+  setSeg('set-layout', layoutMode);
   settingsModal.classList.remove('hidden');
 }
 
@@ -787,7 +904,8 @@ $('add-btn').addEventListener('click', () => openEntryModal(null, activeView ===
 
 function editorFieldHtml(name, ftype, value, idx) {
   const fid = `ef-${idx}`;
-  const label = `<label for="${fid}">${escapeHtml(name)}</label>`;
+  const disp = FIELD_DISPLAY[name] || name;
+  const label = `<label for="${fid}">${escapeHtml(disp)}</label>`;
   if (ftype === 'textarea') {
     return `<div class="field">${label}<textarea id="${fid}" data-fname="${escapeHtml(name)}" rows="4">${escapeHtml(value || '')}</textarea></div>`;
   }
@@ -807,24 +925,24 @@ function rebuildEditorFields(type, entry) {
     const val = cur ? cur.value : (ftype === 'keys' || ftype === 'list' ? [] : '');
     if (ftype === 'keys') {
       const rows = Array.isArray(val) ? val : [{ label: '', key: '', notes: '' }];
-      html += `<div class="field"><label>${escapeHtml(name)}</label><div class="row-editor" data-editor="keys" data-fname="${escapeHtml(name)}">
+      html += `<div class="field"><label>${escapeHtml(FIELD_DISPLAY[name] || name)}</label><div class="row-editor" data-editor="keys" data-fname="${escapeHtml(name)}">
         ${rows.map((k) => `<div class="kv-row has-notes">
-          <input type="text" class="k-label" placeholder="LABEL（如 主账号）" value="${escapeHtml(k.label || '')}">
-          <input type="password" class="k-key" placeholder="KEY VALUE" value="${escapeHtml(k.key || '')}">
+          <input type="text" class="k-label" placeholder="标签（如 主账号）" value="${escapeHtml(k.label || '')}">
+          <input type="password" class="k-key" autocomplete="new-password" placeholder="密钥值" value="${escapeHtml(k.key || '')}">
           <input type="text" class="k-notes" placeholder="备注" value="${escapeHtml(k.notes || '')}">
           <button type="button" class="icon-btn row-del" title="删除此行">${SVG.trash}</button>
         </div>`).join('')}
-        <button type="button" class="btn-mini editor-add" data-addkey>+ ADD KEY</button>
+        <button type="button" class="btn-mini editor-add" data-addkey>＋ 添加密钥</button>
       </div></div>`;
     } else if (ftype === 'list') {
       const rows = Array.isArray(val) ? val : [];
-      html += `<div class="field"><label>${escapeHtml(name)}</label><div class="row-editor" data-editor="list" data-fname="${escapeHtml(name)}">
+      html += `<div class="field"><label>${escapeHtml(FIELD_DISPLAY[name] || name)}</label><div class="row-editor" data-editor="list" data-fname="${escapeHtml(name)}">
         ${rows.map((m) => `<div class="kv-row has-notes">
-          <input type="text" class="m-name" placeholder="MODEL NAME" value="${escapeHtml(m.name || '')}">
+          <input type="text" class="m-name" placeholder="模型名称" value="${escapeHtml(m.name || '')}">
           <input type="text" class="m-notes" placeholder="备注" value="${escapeHtml(m.notes || '')}">
           <button type="button" class="icon-btn row-del" title="删除此行">${SVG.trash}</button>
         </div>`).join('')}
-        <button type="button" class="btn-mini editor-add" data-addmodel>+ ADD MODEL</button>
+        <button type="button" class="btn-mini editor-add" data-addmodel>＋ 添加模型</button>
       </div></div>`;
     } else {
       html += editorFieldHtml(name, ftype, cur ? cur.value : '', idx);
@@ -836,21 +954,22 @@ function rebuildEditorFields(type, entry) {
 function openEntryModal(id, forceType) {
   editingEntryId = id || null;
   const e = id ? findEntry(id) : null;
-  entryModalTitle.textContent = e ? 'EDIT ENTRY' : 'NEW ENTRY';
+  entryModalTitle.textContent = e ? '编辑条目' : '新增条目';
   entryTypeWrap.classList.toggle('hidden', !!e);
-  eType.value = e ? e.type : (forceType || 'api');
+  const t0 = e ? e.type : (forceType || 'api');
+  setSeg('e-type', t0);
   eTitle.value = e ? e.title : '';
   eTags.value = e ? e.metadata.tags.join(', ') : '';
   eDesc.value = e ? e.metadata.description : '';
-  $('entry-desc-wrap').classList.toggle('hidden', eType.value === 'note');
-  rebuildEditorFields(e ? e.type : eType.value, e || null);
+  $('entry-desc-wrap').classList.toggle('hidden', t0 === 'note');
+  rebuildEditorFields(t0, e || null);
   entryModal.classList.remove('hidden');
   eTitle.focus();
 }
 
-eType.addEventListener('change', () => {
-  $('entry-desc-wrap').classList.toggle('hidden', eType.value === 'note');
-  rebuildEditorFields(eType.value, null);
+eType.addEventListener('segchange', (ev) => {
+  $('entry-desc-wrap').classList.toggle('hidden', ev.detail === 'note');
+  rebuildEditorFields(ev.detail, null);
 });
 
 entryFields.addEventListener('click', (ev) => {
@@ -927,7 +1046,7 @@ entryForm.addEventListener('submit', (ev) => {
     eTitle.focus();
     return;
   }
-  const type = editingEntryId ? (findEntry(editingEntryId) || {}).type : eType.value;
+  const type = editingEntryId ? (findEntry(editingEntryId) || {}).type : segVal('e-type');
   const res = collectEditorFields(type || 'note');
   if (res.error) {
     toast(res.error, true);
@@ -946,7 +1065,7 @@ entryForm.addEventListener('submit', (ev) => {
       e.fields = res.fields;
     }
   } else {
-    const ne = makeEntry(eType.value, title);
+    const ne = makeEntry(segVal('e-type'), title);
     ne.metadata.tags = tags;
     ne.metadata.description = description;
     ne.fields = res.fields;
@@ -1159,15 +1278,15 @@ function closePalette() {
 }
 function paletteCommands(q) {
   const cmds = [
-    { tag: 'CMD', name: 'Search Vault', run: () => { closePalette(); searchInput.focus(); searchInput.select(); } },
-    { tag: 'CMD', name: 'New Entry · API', run: () => { closePalette(); openEntryModal(null, 'api'); } },
-    { tag: 'CMD', name: 'New Entry · Account', run: () => { closePalette(); openEntryModal(null, 'account'); } },
-    { tag: 'CMD', name: 'New Entry · Secure Note', run: () => { closePalette(); openEntryModal(null, 'note'); } },
-    { tag: 'SYS', name: 'Lock Vault', run: () => { closePalette(); lockNow(); } },
-    { tag: 'SYS', name: 'Export Backup', run: () => { closePalette(); doExport(); } },
-    { tag: 'SYS', name: 'Security · Change Password', run: () => { closePalette(); pwdForm.reset(); securityModal.classList.remove('hidden'); pOldFocus(); } },
-    { tag: 'SYS', name: 'Backup', run: () => { closePalette(); backupModal.classList.remove('hidden'); } },
-    { tag: 'SYS', name: 'Settings', run: () => { closePalette(); openSettings(); } }
+    { tag: '命令', name: '搜索保险库', run: () => { closePalette(); searchInput.focus(); searchInput.select(); } },
+    { tag: '新建', name: '条目 · API', run: () => { closePalette(); openEntryModal(null, 'api'); } },
+    { tag: '新建', name: '条目 · 账号', run: () => { closePalette(); openEntryModal(null, 'account'); } },
+    { tag: '新建', name: '条目 · 安全笔记', run: () => { closePalette(); openEntryModal(null, 'note'); } },
+    { tag: '系统', name: '锁定保险库', run: () => { closePalette(); lockNow(); } },
+    { tag: '系统', name: '导出备份文件', run: () => { closePalette(); doExport(); } },
+    { tag: '系统', name: '修改主密码', run: () => { closePalette(); pwdForm.reset(); securityModal.classList.remove('hidden'); pOldFocus(); } },
+    { tag: '系统', name: '数据备份', run: () => { closePalette(); backupModal.classList.remove('hidden'); } },
+    { tag: '系统', name: '偏好设置', run: () => { closePalette(); openSettings(); } }
   ];
   const needle = (q || '').toLowerCase();
   const cmdHits = cmds.filter((c) => c.name.toLowerCase().includes(needle));
@@ -1253,8 +1372,17 @@ function init() {
   let st0 = Object.assign({ autoLock: 0, sound: 'on', fx: 'on' }, getSettings());
   soundEnabled = st0.sound !== 'off';
   fxEnabled = st0.fx !== 'off';
+  humEnabled = st0.hum === 'on';
   syncSoundUI();
-  FX.setEnabled(fxEnabled);
+  syncHumUI();
+  applyAmbient(fxEnabled);
+  applyRain(st0.rain !== 'off');
+  layoutMode = ['auto', 'desktop', 'mobile'].includes(st0.layout) ? st0.layout : 'auto';
+  applyLayoutMode();
+  syncLayoutUI();
+  $('layout-btn').addEventListener('click', cycleLayout);
+  setLayoutSel.addEventListener('segchange', (ev) => setLayoutMode(ev.detail));
+  window.addEventListener('resize', () => { if (layoutMode === 'auto') applyLayoutMode(); });
 
   searchInput.addEventListener('input', () => {
     clearTimeout(searchTimer);
@@ -1268,26 +1396,40 @@ function init() {
   });
   $('export-btn').addEventListener('click', doExport);
 
-  autoLockSel.addEventListener('change', () => {
+  autoLockSel.addEventListener('segchange', (ev) => {
     const s = getSettings();
-    s.autoLock = Number(autoLockSel.value) || 0;
+    s.autoLock = Number(ev.detail) || 0;
     saveSettings(s);
     resetIdle();
     toast('设置已保存');
   });
-  setSound.addEventListener('change', () => {
-    soundEnabled = setSound.value !== 'off';
+  setSound.addEventListener('segchange', (ev) => {
+    soundEnabled = ev.detail !== 'off';
     const s = getSettings();
-    s.sound = setSound.value;
+    s.sound = ev.detail;
     saveSettings(s);
     syncSoundUI();
   });
-  setFx.addEventListener('change', () => {
-    fxEnabled = setFx.value !== 'off';
+  setFx.addEventListener('segchange', (ev) => {
+    fxEnabled = ev.detail !== 'off';
     const s = getSettings();
-    s.fx = setFx.value;
+    s.fx = ev.detail;
     saveSettings(s);
-    FX.setEnabled(fxEnabled);
+    applyAmbient(fxEnabled);
+  });
+  setHum.addEventListener('segchange', (ev) => {
+    humEnabled = ev.detail === 'on';
+    const s = getSettings();
+    s.hum = ev.detail;
+    saveSettings(s);
+    HUM.set(humEnabled);
+  });
+  if (setRain) setRain.addEventListener('segchange', (ev) => {
+    const s = getSettings();
+    s.rain = ev.detail;
+    saveSettings(s);
+    applyRain(ev.detail !== 'off');
+    toast(ev.detail === 'on' ? '数据雨：开' : '数据雨：关');
   });
   pwdForm.addEventListener('submit', handlePwdSubmit);
 
@@ -1337,7 +1479,23 @@ function init() {
     const b = ev.target.closest('[data-toggle]');
     if (b) togglePassword(b.dataset.toggle, b);
   });
+
+  document.querySelectorAll('[data-close]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const m = $(btn.dataset.close);
+      if (m) m.classList.add('hidden');
+    });
+  });
+
+  document.querySelectorAll('.modal-backdrop').forEach((bd) => {
+    bd.addEventListener('click', (ev) => {
+      if (ev.target === bd) bd.classList.add('hidden');
+    });
+  });
+
+  palBackdrop.addEventListener('click', (ev) => {
+    if (ev.target === palBackdrop) closePalette();
+  });
 }
 
-FX.init();
 init();
