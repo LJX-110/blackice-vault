@@ -293,7 +293,7 @@
 <script>
 window.addEventListener('error', function (ev) {
   var h = document.getElementById('lock-hint');
-  if (h) h.textContent = '加载异常：' + (ev.message || '资源加载失败') + ' —— 请确认 crypto.js / vault.js / app.js 已全部上传，然后 Ctrl+F5 强刷';
+  if (h) h.textContent = '加载异常：' + (ev.message || '资源加载失败') + ' —— 当前访问地址：' + location.origin + '；请确认三个 js 文件为同一新版本，然后 Ctrl+F5 强刷（数据与访问地址绑定，换地址=空库）';
 }, true);
 window.addEventListener('DOMContentLoaded', function () {
   if (location.protocol === 'file:') {
@@ -308,6 +308,6 @@ window.addEventListener('DOMContentLoaded', function () {
   }
 });
 </script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=4"></script>
 </body>
 </html>

@@ -1289,7 +1289,7 @@ function paletteCommands(q) {
     { tag: '系统', name: '偏好设置', run: () => { closePalette(); openSettings(); } }
   ];
   const needle = (q || '').toLowerCase();
-  const cmdHits = cmds.filter((c) => c.name.toLowerCase().includes(needle));
+  const cmdHits = cmds.filter((c) => String(c.name || '').toLowerCase().includes(needle));
   const entryHits = entries
     .filter((en) => needle && entryHaystack(en).includes(needle))
     .slice(0, 6)
@@ -1434,7 +1434,7 @@ function init() {
   pwdForm.addEventListener('submit', handlePwdSubmit);
 
   document.addEventListener('keydown', (ev) => {
-    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+    if ((ev.ctrlKey || ev.metaKey) && String(ev.key || '').toLowerCase() === 'k') {
       ev.preventDefault();
       if (cryptoKey) {
         palBackdrop.classList.contains('hidden') ? openPalette() : closePalette();
@@ -1453,7 +1453,7 @@ function init() {
       }
       if (detailPanel.classList.contains('open')) detailPanel.classList.remove('open');
     }
-    if (ev.key.toLowerCase() === 'l' && cryptoKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+    if (String(ev.key || '').toLowerCase() === 'l' && cryptoKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
       const ae = document.activeElement;
       const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT');
       if (!typing) lockNow();

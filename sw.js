@@ -1,4 +1,4 @@
-const CACHE = 'blackice-v3';
+const CACHE = 'blackice-v4';
 const ASSETS = [
   './',
   './index.html',
