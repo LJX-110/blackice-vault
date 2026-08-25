@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="BLACKICE">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -127,9 +127,9 @@
       <div class="field" id="entry-type-wrap">
         <span class="field-label">类型 <span class="required">*</span></span>
         <div id="e-type" class="seg" role="radiogroup" aria-label="类型">
-          <button type="button" class="seg-btn on" data-val="api">API</button>
-          <button type="button" class="seg-btn" data-val="account">账号</button>
-          <button type="button" class="seg-btn" data-val="note">安全笔记</button>
+          <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-val="api">API</button>
+          <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="account">账号</button>
+          <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="note">安全笔记</button>
         </div>
       </div>
       <div class="field">
@@ -218,46 +218,46 @@
     <div class="field">
       <span class="field-label">自动锁屏</span>
       <div id="auto-lock" class="seg" role="radiogroup" aria-label="自动锁屏">
-        <button type="button" class="seg-btn on" data-val="0">不锁</button>
-        <button type="button" class="seg-btn" data-val="5">5 分</button>
-        <button type="button" class="seg-btn" data-val="15">15 分</button>
-        <button type="button" class="seg-btn" data-val="30">30 分</button>
+        <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-val="0">不锁</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="5">5 分</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="15">15 分</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="30">30 分</button>
       </div>
     </div>
     <div class="field">
       <span class="field-label">音效</span>
       <div id="set-sound" class="seg" role="radiogroup" aria-label="音效">
-        <button type="button" class="seg-btn on" data-val="on">开启</button>
-        <button type="button" class="seg-btn" data-val="off">关闭</button>
+        <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-val="on">开启</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="off">关闭</button>
       </div>
     </div>
     <div class="field">
       <span class="field-label">终端环境嗡鸣</span>
       <div id="set-hum" class="seg" role="radiogroup" aria-label="终端环境嗡鸣">
-        <button type="button" class="seg-btn" data-val="on">开启</button>
-        <button type="button" class="seg-btn on" data-val="off">关闭</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="on">开启</button>
+        <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-val="off">关闭</button>
       </div>
     </div>
     <div class="field">
       <span class="field-label">布局模式</span>
       <div id="set-layout" class="seg" role="radiogroup" aria-label="布局模式">
-        <button type="button" class="seg-btn on" data-val="auto">自动</button>
-        <button type="button" class="seg-btn" data-val="desktop">桌面</button>
-        <button type="button" class="seg-btn" data-val="mobile">移动</button>
+        <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-val="auto">自动</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="desktop">桌面</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="mobile">移动</button>
       </div>
     </div>
     <div class="field">
       <span class="field-label">环境动效</span>
       <div id="set-fx" class="seg" role="radiogroup" aria-label="环境动效">
-        <button type="button" class="seg-btn on" data-val="on">开启</button>
-        <button type="button" class="seg-btn" data-val="off">关闭</button>
+        <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-val="on">开启</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="off">关闭</button>
       </div>
     </div>
     <div class="field">
       <span class="field-label">数据雨（红色）</span>
       <div id="set-rain" class="seg" role="radiogroup" aria-label="数据雨">
-        <button type="button" class="seg-btn on" data-val="on">开启</button>
-        <button type="button" class="seg-btn" data-val="off">关闭</button>
+        <button type="button" class="seg-btn on" role="radio" aria-checked="true" data-val="on">开启</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-val="off">关闭</button>
       </div>
     </div>
     <div class="modal-actions">
@@ -272,6 +272,7 @@
     <p id="confirm-message"></p>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" id="confirm-cancel">取消</button>
+      <button type="button" class="btn btn-ghost hidden" id="confirm-alt">合并导入</button>
       <button type="button" class="btn btn-primary" id="confirm-ok">确定</button>
     </div>
   </div>

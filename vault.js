@@ -132,7 +132,7 @@ function normalizeEntriesArray(entries) {
 }
 
 function getStorageKey(name) {
-  const map = { salt: LS_SALT, vault: LS_VAULT, iter: LS_ITER, settings: LS_SETTINGS, vaultV2: LS_VAULT_V2 };
+  const map = { salt: LS_SALT, vault: LS_VAULT, iter: LS_ITER, settings: LS_SETTINGS, vaultV2: LS_VAULT_V2, lastBackup: 'kv.lastBackup' };
   return map[name];
 }
 

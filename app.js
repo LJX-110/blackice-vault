@@ -74,12 +74,19 @@ function segVal(id) {
 function setSeg(id, val) {
   const el = $(id);
   if (!el) return;
-  el.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.val === String(val)));
+  el.querySelectorAll('.seg-btn').forEach((b) => {
+    const on = b.dataset.val === String(val);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
 }
 document.addEventListener('click', (e) => {
   const b = e.target.closest && e.target.closest('.seg-btn');
   if (!b || b.classList.contains('on') || !b.parentElement.classList.contains('seg')) return;
-  b.parentElement.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+  b.parentElement.querySelectorAll('.seg-btn').forEach((x) => {
+    x.classList.toggle('on', x === b);
+    x.setAttribute('aria-checked', x === b ? 'true' : 'false');
+  });
   b.parentElement.dispatchEvent(new CustomEvent('segchange', { detail: b.dataset.val }));
 });
 const setLayoutSel = $('set-layout');
@@ -442,6 +449,11 @@ async function handleUnlock(e) {
     }
     const salt = crypto.getRandomValues(new Uint8Array(16));
     lockBusy(true);
+    const prevVault = readLocal('vault');
+    if (prevVault) {
+      writeLocal('vaultV2', prevVault);
+      toast('检测到已有保险库数据，旧密文已备份到 kv.vault.v2', true);
+    }
     writeLocal('salt', b64encode(salt));
     saveIterations(PBKDF2_ITERATIONS);
     cryptoKey = await deriveKey(pw, salt, PBKDF2_ITERATIONS);
@@ -454,6 +466,7 @@ async function handleUnlock(e) {
     const candidates = storedIter ? [storedIter] : [PBKDF2_ITERATIONS, LEGACY_ITERATIONS];
     const oldVaultStr = readLocal('vault');
     let unlocked = false;
+    let migrationFailed = false;
     for (const iter of candidates) {
       try {
         cryptoKey = await deriveKey(pw, salt, iter);
@@ -478,14 +491,18 @@ async function handleUnlock(e) {
         }
         saveIterations(PBKDF2_ITERATIONS);
         break;
-      } catch {
+      } catch (err) {
         cryptoKey = null;
+        if (err && (err.message === 'migration-mismatch' || err.message === 'migration-count')) {
+          migrationFailed = true;
+          break;
+        }
       }
     }
     if (!unlocked) {
       lockBusy(false);
       lockPassword.value = '';
-      lockError.textContent = '密码错误';
+      lockError.textContent = migrationFailed ? '数据迁移校验失败——数据未做任何改动，请勿反复尝试密码' : '密码错误';
       lockError.classList.remove('hidden');
       return;
     }
@@ -496,12 +513,21 @@ async function handleUnlock(e) {
   enterApp();
 }
 
+function checkBackupReminder() {
+  if (!entries.length) return;
+  const lb = readLocal('lastBackup');
+  if (!lb) { toast('建议尽快导出一次加密备份（侧栏 → 数据备份）'); return; }
+  const days = Math.floor((Date.now() - new Date(lb).getTime()) / 86400000);
+  if (days > 7) toast('已 ' + days + ' 天未导出备份，建议备份一次', true);
+}
+
 function enterApp() {
   lockScreen.classList.add('hidden');
   runBoot(() => {
     appScreen.classList.remove('hidden');
     applySessionPrefs();
     renderAll();
+    checkBackupReminder();
     SFX.unlock();
     resetIdle();
   });
@@ -640,7 +666,7 @@ function applyRain(on) { Rain.set(on); }
   document.addEventListener('mousemove', (e) => {
     const t = e.target;
     const el = t && t.closest && t.closest(SEL);
-    if (!el) return;
+    if (!el || el.classList.contains('dragging')) return;
     const r = el.getBoundingClientRect();
     const px = (e.clientX - r.left) / r.width - 0.5;
     const py = (e.clientY - r.top) / r.height - 0.5;
@@ -726,6 +752,18 @@ function renderToolbarCount(listLen) {
   countEl.innerHTML = `<b>${listLen}</b> ENTRIES`;
 }
 
+function highlightText(text) {
+  const esc = escapeHtml(text || '');
+  const q = searchInput.value.trim();
+  if (!q) return esc;
+  const eq = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\function entryItemHtml(e, i) {');
+  try {
+    return esc.replace(new RegExp(eq, 'gi'), (m) => '<mark>' + m + '</mark>');
+  } catch {
+    return esc;
+  }
+}
+
 function entryItemHtml(e, i) {
   const sel = e.id === selectedId ? ' selected' : '';
   const meta = TYPES[e.type] || TYPES.note;
@@ -743,10 +781,10 @@ function entryItemHtml(e, i) {
     const len = cf && typeof cf.value === 'string' ? cf.value.replace(/\s/g, '').length : 0;
     stat = `${len} CHARS`;
   }
-  return `<div class="entry-item${sel} ${meta.cls}" data-id="${e.id}" style="animation-delay:${Math.min(i * 35, 240)}ms">
+  return `<div class="entry-item${sel} ${meta.cls}" data-id="${e.id}">
     <div class="e-row1">
       <span class="e-type ${meta.cls}">${meta.tag}</span>
-      <span class="e-title">${escapeHtml(e.title)}</span>
+      <span class="e-title">${highlightText(e.title)}</span>
       ${e.metadata.favorite ? '<span class="e-fav">★</span>' : ''}
       <button type="button" class="icon-btn drag-handle" draggable="true" data-drag="${e.id}" title="拖动到顶部">${SVG.grip}</button>
     </div>
@@ -860,9 +898,13 @@ function renderList() {
   }
   const rows = items ? items : '';
   entryListEl.innerHTML = rows;
-  Array.from(entryListEl.children).forEach((el, i) => {
-    if (el.classList && el.classList.contains('entry-item')) el.style.animationDelay = Math.min(i * 26, 260) + 'ms';
-  });
+  const searching = !!searchInput.value.trim();
+  entryListEl.classList.toggle('no-anim', searching);
+  if (!searching) {
+    Array.from(entryListEl.children).forEach((el, i) => {
+      if (el.classList && el.classList.contains('entry-item')) el.style.animationDelay = Math.min(i * 26, 260) + 'ms';
+    });
+  }
   entryListEl.appendChild(empty);
 }
 
@@ -1162,7 +1204,9 @@ entryListEl.addEventListener('dragstart', (ev) => {
   dragId = h.dataset.drag;
   ev.dataTransfer.effectAllowed = 'move';
   try { ev.dataTransfer.setData('text/plain', dragId); } catch (err) {}
-  h.closest('.entry-item').classList.add('dragging');
+  const dragCard = h.closest('.entry-item');
+  dragCard.classList.add('dragging');
+  dragCard.style.transform = '';
 });
 entryListEl.addEventListener('dragover', (ev) => {
   if (!dragId) return;
@@ -1205,6 +1249,7 @@ function doExport() {
   a.download = `${APP_NAME}-backup-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
+  writeLocal('lastBackup', new Date().toISOString());
   toast('备份已导出，请妥善保管文件与主密码');
 }
 
@@ -1213,13 +1258,32 @@ async function handleImport(file) {
   try {
     const data = parseImportPayload(JSON.parse(await file.text()));
     if (!data) throw new Error('bad');
-    openConfirm('导入将覆盖当前全部数据并锁定应用，确定继续？', () => {
+    openConfirm('覆盖导入：清空当前数据并锁定，用备份主密码解锁。合并导入：把备份条目并入当前库（要求备份主密码与当前一致）。', () => {
       writeLocal('salt', data.salt);
       writeLocal('vault', JSON.stringify(data.vault));
       removeLocal('iter');
       if (data.iter > 0) saveIterations(data.iter);
       lockNow();
       toast('已导入，使用备份库的主密码解锁');
+    }, async () => {
+      try {
+        const raw = await decryptData(data.vault, cryptoKey);
+        const vNorm = migrateData(raw);
+        const map = new Map(entries.map((e) => [e.id, e]));
+        let added = 0;
+        let updated = 0;
+        for (const inc of vNorm.entries) {
+          const ex = map.get(inc.id);
+          if (!ex) { map.set(inc.id, inc); added++; }
+          else if ((inc.metadata.updatedAt || '') > (ex.metadata.updatedAt || '')) { map.set(inc.id, inc); updated++; }
+        }
+        entries = [...map.values()];
+        await persistVault();
+        renderAll();
+        toast('合并完成：新增 ' + added + ' 条，更新 ' + updated + ' 条');
+      } catch {
+        toast('合并失败：备份主密码与当前不一致', true);
+      }
     });
   } catch {
     toast('备份文件无效', true);
@@ -1257,8 +1321,12 @@ async function handlePwdSubmit(ev) {
 }
 
 let confirmCallback = null;
-function openConfirm(message, onOk) {
+let confirmAltCallback = null;
+function openConfirm(message, onOk, onAlt) {
   confirmCallback = onOk;
+  confirmAltCallback = typeof onAlt === 'function' ? onAlt : null;
+  const altBtn = $('confirm-alt');
+  if (altBtn) altBtn.classList.toggle('hidden', !confirmAltCallback);
   $('confirm-message').textContent = message;
   $('confirm-modal').classList.remove('hidden');
   $('confirm-ok').focus();
@@ -1266,11 +1334,19 @@ function openConfirm(message, onOk) {
 $('confirm-cancel').addEventListener('click', () => {
   $('confirm-modal').classList.add('hidden');
   confirmCallback = null;
+  confirmAltCallback = null;
+});
+$('confirm-alt').addEventListener('click', () => {
+  $('confirm-modal').classList.add('hidden');
+  if (typeof confirmAltCallback === 'function') confirmAltCallback();
+  confirmCallback = null;
+  confirmAltCallback = null;
 });
 $('confirm-ok').addEventListener('click', () => {
   $('confirm-modal').classList.add('hidden');
   if (typeof confirmCallback === 'function') confirmCallback();
   confirmCallback = null;
+  confirmAltCallback = null;
 });
 
 function closePalette() {
@@ -1461,7 +1537,7 @@ function init() {
     if (ev.key === 'Tab') {
       const open = document.querySelector('.modal-backdrop:not(.hidden), .palette-backdrop:not(.hidden)');
       if (!open) return;
-      const f = open.querySelectorAll('button, input, select, textarea, [tabindex]');
+      const f = open.querySelectorAll('button, input, textarea, [tabindex]');
       if (!f.length) return;
       const first = f[0], last = f[f.length - 1];
       if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
